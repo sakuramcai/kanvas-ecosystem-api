@@ -78,7 +78,7 @@ class PeoplesRepository
         ?string $email = null,
         ?string $phone = null
     ): ?People {
-        if (! empty($email) && ! empty($phone)) {
+        if (! $email && ! $phone) {
             throw new Exception('Email or Phone is required');
         }
         $q = People::from('peoples as p')
