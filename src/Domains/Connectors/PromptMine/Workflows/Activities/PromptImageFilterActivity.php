@@ -10,7 +10,6 @@ use Exception;
 use finfo;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Kanvas\Apps\Models\Apps;
@@ -272,8 +271,7 @@ class PromptImageFilterActivity extends KanvasActivity implements WorkflowActivi
     protected function processImageWithFalAi(string $fileUrl, string $imageFilter, Model $entity, array $params): array
     {
         // Step 1: Submit the image for processing
-        $model = 'fal-ai/';
-        $submitResponse = $this->submitImage($this->apiUrl, $fileUrl, $imageFilter, $entity->message['prompt'] ?? '', $model, $params)->json();
+        $submitResponse = $this->submitImage($fileUrl, $imageFilter, $entity->message['prompt'] ?? '', $params);
 
         if (! isset($submitResponse['request_id'])) {
             throw new Exception('Failed to submit image for processing: ' . json_encode($submitResponse));
@@ -448,46 +446,43 @@ class PromptImageFilterActivity extends KanvasActivity implements WorkflowActivi
     protected function processImageWithGeminiBanana(string $imageUrl, string $prompt, Model $entity, string $imageFilter, array $params): ?Filesystem
     {
         $apiUrl = str_replace('api/image/fal-ai/image-to-image', '', $this->apiUrl);
-        $apiUrl = rtrim($apiUrl, '/') . '/api/image/Gemini-Nano-Banana/i2i';
+        $apiUrl = rtrim($apiUrl, '/') . '/api/image/google/Gemini-Nano-Banana/i2i';
 
-        // $imageContent = Http::get($imageUrl)->body();
-        // if (empty($imageContent)) {
-        //     throw new Exception("Failed to download image from URL: {$imageUrl}");
-        // }
+        $imageContent = Http::get($imageUrl)->body();
+        if (empty($imageContent)) {
+            throw new Exception("Failed to download image from URL: {$imageUrl}");
+        }
 
         // Extract filename from URL or use a default
-        // $filename = basename(parse_url($imageUrl, PHP_URL_PATH)) ?: 'image.png';
+        $filename = basename(parse_url($imageUrl, PHP_URL_PATH)) ?: 'image.png';
 
         // Create multipart request
-        // $response = Http::asMultipart()
-        //     ->attach('image', $imageContent, $filename)
-        //     ->attach('model', 'gemini-2.5-flash-image-preview')
-        //     ->attach('prompt', $prompt);
+        $response = Http::asMultipart()
+            ->attach('image', $imageContent, $filename)
+            ->attach('model', 'gemini-2.5-flash-image-preview')
+            ->attach('prompt', $prompt);
 
-        $response = $this->submitImage($apiUrl, $imageUrl, $imageFilter, $prompt, '', $params);
-        $responseData = $response->json();
+        if (isset($params['additional_images']) && ! empty($params['additional_images'])) {
+            $index = 1;
+            foreach ($params['additional_images'] as $additionalImage) {
+                $response->attach('image_' . $index++, Http::get($additionalImage)->body(), basename(parse_url($additionalImage, PHP_URL_PATH)));
+            }
+        }
 
-        // if (isset($params['additional_images']) && ! empty($params['additional_images'])) {
-        //     $index = 2;
-        //     foreach ($params['additional_images'] as $additionalImage) {
-        //         $response->attach('image_' . $index, Http::get($additionalImage)->body(), basename(parse_url($additionalImage, PHP_URL_PATH)));
-        //         $index++;
-        //     }
-        //     $apiUrl = str_replace('i2i', 'Mi2i', $apiUrl);
-        // }
-
-        // $response = $response->post($apiUrl);
+        $response = $response->post($apiUrl);
 
         if (! $response->successful()) {
-            throw new Exception('Gemini Banana API request failed: ' . json_encode($responseData));
+            throw new Exception('Gemini Banana API request failed: ' . $response->body());
         }
+
+        $responseData = $response->json();
 
         // Extract the URL from the response structure
         // Response format: { "0": { "url": "...", "file_name": "...", ... } }
         $processedImageUrl = null;
         if (isset($responseData['0']['url'])) {
             $processedImageUrl = $responseData['0']['url'];
-        } elseif (isset($response[0]['url'])) {
+        } elseif (isset($responseData[0]['url'])) {
             $processedImageUrl = $responseData[0]['url'];
         }
 
@@ -578,14 +573,14 @@ class PromptImageFilterActivity extends KanvasActivity implements WorkflowActivi
             $params['via'] ?? ['database']
         );
 
-        $title = html_entity_decode($title, ENT_QUOTES);
+        $title = trim($title);
 
         try {
             // Send notification to the user
             $newMessageNotification = new ImageProcessingPushNotification(
                 user: $entity->user,
                 entity: $entity,
-                message: "Your image for {$title} has been processed",
+                message: htmlspecialchars("Your image for {$title} has been processed", ENT_QUOTES, 'UTF-8'),
                 title: 'Image Processed',
                 via: $endViaList,
                 templates: [
@@ -637,22 +632,22 @@ class PromptImageFilterActivity extends KanvasActivity implements WorkflowActivi
     /**
      * Submit an image for processing
      */
-    protected function submitImage(string $apiUrl, string $imageUrl, string $imageFilter, string $prompt, string $model, array $params): Response
+    protected function submitImage(string $imageUrl, string $imageFilter, string $prompt, array $params): array
     {
         if (isset($params['additional_images']) && ! empty($params['additional_images'])) {
             $params['additional_images'][] = $imageUrl;
-            $imageUrl = array_values($params['additional_images']);
+            $imageUrl = $params['additional_images'];
         }
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
-        ])->post($apiUrl, [
+        ])->post($this->apiUrl, [
             'operation' => 'submit',
             'image_url' => $imageUrl,
-            'model' => $model . $imageFilter,
+            'model' => 'fal-ai/' . $imageFilter,
             'prompt' => $prompt,
         ]);
 
-        return $response;
+        return $response->json();
     }
 
     /**
