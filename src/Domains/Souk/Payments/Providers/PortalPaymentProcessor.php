@@ -22,6 +22,7 @@ use Kanvas\Connectors\EchoPay\Enums\MerchantCategoryEnum;
 use Kanvas\Connectors\EchoPay\Enums\MerchantDocumentTypesEnum;
 use Kanvas\Connectors\EchoPay\Enums\MerchantPlatformEnum;
 use Kanvas\Connectors\EchoPay\Enums\MerchantTokenizationEnum;
+use Kanvas\Connectors\EchoPay\Enums\ErrorsEnum;
 use Kanvas\Connectors\EchoPay\Enums\PaymentStatusEnum as EnumsPaymentStatusEnum;
 use Kanvas\Connectors\EchoPay\Exceptions\EchoPayException;
 use Kanvas\Connectors\EchoPay\Services\EchoPayService;
@@ -362,7 +363,12 @@ class PortalPaymentProcessor
             EnumsPaymentStatusEnum::PENDING_AUTHENTICATION->value => PaymentStatusEnum::PENDING_AUTHORIZATION->value,
         ];
 
-        $paymentStatus = $statusMap[$enrollmentData['status']];
+        $consumerData = ConsumerAuthentication::from($enrollmentData['consumerAuthenticationInformation']);
+        $eci = $consumerData->eci ?? $consumerData->eciRaw;
+
+        $isInvalidEci = $eci == "06";
+
+        $paymentStatus = $isInvalidEci ? PaymentStatusEnum::FAILED->value : $statusMap[$enrollmentData['status']];
         $payment->status = $paymentStatus;
         $payment->addMetadata([
             'enrollment_data' => $enrollmentData,
@@ -378,10 +384,21 @@ class PortalPaymentProcessor
 
         $errors = $this->extractErrorsFromEnrollment($enrollmentData);
 
+        $consumerData = ConsumerAuthentication::from($enrollmentData['consumerAuthenticationInformation']);
+        $eci = $consumerData->eci ?? $consumerData->eciRaw;
+
+        if ($isInvalidEci) {
+            return [
+                'status' => $paymentStatus,
+                'message' => $paymentStatus . ErrorsEnum::ECI_06->getUserMessage(),
+                'data' => $consumerData,
+            ];
+        }
+
         return [
             'status' => $paymentStatus,
             'message' => $paymentStatus . $errors['message'],
-            'data' => ConsumerAuthentication::from($enrollmentData['consumerAuthenticationInformation']),
+            'data' => $consumerData,
         ];
     }
 

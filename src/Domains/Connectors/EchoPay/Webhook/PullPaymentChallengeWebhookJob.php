@@ -20,18 +20,18 @@ class PullPaymentChallengeWebhookJob extends ProcessWebhookJob
         $orderId = $this->webhookRequest->payload['MD'];
         $transactionId = $this->webhookRequest->payload['TransactionId'];
 
-
         if (! $orderId) {
             return [
                 'message' => 'Not a valid order',
             ];
         }
 
-        $payment = Payments::where([
+        $order = Order::where([
             'apps_id' => $this->receiver->app->getId(),
-            'payable_id' => $orderId,
-            'payable_type' => Order::class,
+            'id' => $orderId,
         ])->first();
+
+        $payment = Payments::getLatestForEntity($order);
 
         if (! $payment) {
             throw new Exception('Payment not found');

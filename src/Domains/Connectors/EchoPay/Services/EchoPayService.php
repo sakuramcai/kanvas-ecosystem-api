@@ -187,7 +187,7 @@ class EchoPayService
 
         return [
             'clientReferenceInformation' => [
-                'code' => $response['data']['clientReferenceInformation']['code'],
+                'code' => isset($response['data']['clientReferenceInformation']) ? $response['data']['clientReferenceInformation']['code'] : null,
             ],
             'consumerAuthenticationInformation' => [
                 'accessToken' => $response['data']['consumerAuthenticationInformation']['accessToken'],
@@ -230,7 +230,7 @@ class EchoPayService
 
         return [
             'clientReferenceInformation' => [
-                'code' => $response['data']['clientReferenceInformation']['code'],
+                'code' => isset($response['data']['clientReferenceInformation']) ? $response['data']['clientReferenceInformation']['code'] : null,
             ],
             'consumerAuthenticationInformation' => ConsumerAuthentication::from([
                 'indicator' => $response['data']['consumerAuthenticationInformation']['ecommerceIndicator'] ?? null,
@@ -307,7 +307,7 @@ class EchoPayService
 
         return [
             'clientReferenceInformation' => [
-                'code' => $response['data']['clientReferenceInformation']['code'],
+                'code' => isset($response['data']['clientReferenceInformation']) ? $response['data']['clientReferenceInformation']['code'] : null,
             ],
             'consumerAuthenticationInformation' => ConsumerAuthentication::from([
                 'indicator' => $consumerInformation['ecommerceIndicator'] ?? $consumerInformation['indicator'] ?? null,
