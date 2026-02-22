@@ -23,7 +23,7 @@ final class CompanySubscriptionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->company = Companies::factory()->create();
+        $this->company = auth()->user()->getCurrentCompany();
         $this->appModel = app(Apps::class);
         if (empty($this->appModel->get(ConfigurationEnum::STRIPE_SECRET_KEY->value))) {
             $this->appModel->set(ConfigurationEnum::STRIPE_SECRET_KEY->value, getenv('TEST_STRIPE_SECRET_KEY'));
@@ -157,5 +157,34 @@ final class CompanySubscriptionTest extends TestCase
         $this->assertEquals('active', $reactivatedSubscription->stripe_status);
         $this->assertNull($reactivatedSubscription->ends_at);
         $this->assertEquals($this->company->id, $reactivatedSubscription->owner->company->id);
+    }
+
+    public function testCompanySubscriptionResponseFields()
+    {
+        $this->createSubscription();
+        $user = auth()->user();
+
+        $response = $this->graphQL('
+            query {
+                companySubscriptions {
+                    data {
+                        id
+                        stripe_status
+                        status
+                        plan_name
+                        started_at
+                        is_active
+                    }
+                }
+            }
+        ', [], [], [
+            'X-Kanvas-Location' => $user->getCurrentBranch()->uuid,
+        ]);
+
+        $subscription = $response->json('data.companySubscriptions.data.0');
+        $this->assertEquals($subscription['stripe_status'], $subscription['status']);
+        $this->assertEquals('default', $subscription['plan_name']);
+        $this->assertNotEmpty($subscription['started_at']);
+        $this->assertTrue($subscription['is_active']);
     }
 }

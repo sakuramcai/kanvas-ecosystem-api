@@ -99,6 +99,10 @@ final class SubscriptionsTest extends TestCase
                     id
                     stripe_id
                     stripe_status
+                    status
+                    plan_name
+                    started_at
+                    is_active
                     trial_ends_at
                     items {
                         id
@@ -117,9 +121,13 @@ final class SubscriptionsTest extends TestCase
             'data' => [
                 'createSubscription' => [
                    'stripe_status' => 'trialing',
+                   'status' => 'trialing',
+                   'plan_name' => 'default',
+                   'is_active' => true,
                 ],
             ],
         ]);
+        $this->assertNotEmpty($response->json('data.createSubscription.started_at'));
     }
 
     public function testCreateSubscriptionWithoutTrial()
@@ -164,6 +172,10 @@ final class SubscriptionsTest extends TestCase
                     id
                     stripe_id
                     stripe_status
+                    status
+                    plan_name
+                    started_at
+                    is_active
                     trial_ends_at
                     items {
                         id
@@ -182,9 +194,13 @@ final class SubscriptionsTest extends TestCase
             'data' => [
                 'createSubscription' => [
                    'stripe_status' => 'active',
+                   'status' => 'active',
+                   'plan_name' => 'default',
+                   'is_active' => true,
                 ],
             ],
         ]);
+        $this->assertNotEmpty($response->json('data.createSubscription.started_at'));
     }
 
     public function testUpdateSubscription()
@@ -202,6 +218,10 @@ final class SubscriptionsTest extends TestCase
                 id
                 stripe_id
                 stripe_status
+                status
+                plan_name
+                started_at
+                is_active
             }
         }
     ', [], [], [
@@ -219,6 +239,10 @@ final class SubscriptionsTest extends TestCase
                     id
                     stripe_id
                     stripe_status
+                    status
+                    plan_name
+                    started_at
+                    is_active
                 }
             }
         ', [], [], [
@@ -228,9 +252,13 @@ final class SubscriptionsTest extends TestCase
             'data' => [
                 'updateSubscription' => [
                     'stripe_status' => 'trialing',
+                    'status' => 'trialing',
+                    'plan_name' => 'default',
+                    'is_active' => true,
                 ],
             ],
         ]);
+        $this->assertNotEmpty($response->json('data.updateSubscription.started_at'));
     }
 
     public function testListSubscription()
@@ -261,6 +289,10 @@ final class SubscriptionsTest extends TestCase
                         id
                         stripe_id
                         stripe_status
+                        status
+                        plan_name
+                        started_at
+                        is_active
                     }
                 }
             }
@@ -274,11 +306,15 @@ final class SubscriptionsTest extends TestCase
                     'data' => [
                         [
                             'stripe_status' => 'trialing',
+                            'status' => 'trialing',
+                            'plan_name' => 'default',
+                            'is_active' => true,
                         ],
                     ],
                 ],
             ],
         ]);
+        $this->assertNotEmpty($response->json('data.companySubscriptions.data.0.started_at'));
     }
 
     public function testCancelSubscription()
